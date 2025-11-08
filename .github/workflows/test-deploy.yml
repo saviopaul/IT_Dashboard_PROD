@@ -6,16 +6,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Decode SSH key and test connection
-        env:
-          VPS_KEY: ${{ secrets.VPS_KEY }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-        run: |
-          # decode and prepare the key
-          echo "$VPS_KEY" | base64 -d > ~/.ssh/vps_key
-          chmod 600 ~/.ssh/vps_key
-          echo "✅ SSH key decoded"
-
-          # test connection manually
-          ssh -v -i ~/.ssh/vps_key -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "hostname; uptime; df -h | grep /dev/"
+      - name: Verify SSH Connection to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script_stop: true
+          debug: true
+          script: |
+            echo "✅ Connected successfully to $HOSTNAME"
+            uptime
+            df -h | grep '/dev/'
