@@ -1,0 +1,19 @@
+name: 🔍 Test VPS Connection
+
+on:
+  workflow_dispatch:  # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ✅ Verify SSH Connection to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script: |
+            echo "✅ GitHub Actions successfully connected to $(hostname)"
+            uptime
+            df -h | grep 'Filesystem\|/dev/'
