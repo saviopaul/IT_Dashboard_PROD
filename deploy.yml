@@ -1,0 +1,39 @@
+name: 🚀 Auto-Deploy IT Dashboard
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Hostinger VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          source: "./*"
+          target: "/var/www/it-dashboard"
+          strip_components: 1
+
+      - name: Restart Nginx and PM2
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script: |
+            sudo systemctl reload nginx
+            if pm2 list | grep -q "it-dashboard"; then
+              pm2 restart it-dashboard
+            else
+              pm2 start "python3 -m http.server 8080" --name it-dashboard
+            fi
