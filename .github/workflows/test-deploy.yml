@@ -12,7 +12,10 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          echo "$VPS_KEY" | base64 -d > id_rsa
-          chmod 600 id_rsa
-          echo "✅ SSH Key decoded successfully"
-          ssh -i id_rsa -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "echo 'Connected to:' $(hostname); uptime; df -h | grep /dev/"
+          # decode and prepare the key
+          echo "$VPS_KEY" | base64 -d > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "✅ SSH key decoded"
+
+          # test connection manually
+          ssh -v -i ~/.ssh/vps_key -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "hostname; uptime; df -h | grep /dev/"
