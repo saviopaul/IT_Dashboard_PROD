@@ -1,4 +1,4 @@
-name: 🚀 Auto-Deploy IT Dashboard (Safe Backup + Rotation)
+name: Deploy IT Dashboard to VPS
 
 on:
   push:
@@ -7,64 +7,42 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Hostinger VPS with Backup Rotation
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Backup current deployment before update
-        uses: appleboy/ssh-action@v1.1.0
+      # 2️⃣ Connect to your Hostinger VPS via SSH
+      - name: Deploy to Hostinger VPS
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_KEY }}
+          key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            BACKUP_DIR="/root/backups"
-            mkdir -p "$BACKUP_DIR"
-            TS=$(date +'%Y%m%d_%H%M')
-            ZIP_PATH="$BACKUP_DIR/it-dashboard_$TS.zip"
-            echo "📦 Creating pre-deploy backup at $ZIP_PATH"
-            zip -r "$ZIP_PATH" /var/www/it-dashboard >/dev/null
-            echo "✅ Backup complete."
+            echo "🔄 Updating live dashboard..."
+            cd /var/www/it-dashboard
 
-            # 🧹 Backup rotation: keep only latest 5 backups
-            BACKUP_COUNT=$(ls -1t $BACKUP_DIR/*.zip 2>/dev/null | wc -l)
-            if [ "$BACKUP_COUNT" -gt 5 ]; then
-              echo "🧹 Rotating backups (keeping only latest 5)..."
-              ls -1t $BACKUP_DIR/*.zip | tail -n +6 | xargs rm -f
-              echo "✅ Old backups removed."
+            # Pull latest changes
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Optional: ensure permissions are correct
+            chown -R root:root /var/www/it-dashboard
+            chmod -R 755 /var/www/it-dashboard
+
+            # Run footer fix after deployment
+            if [ -f "/var/www/it-dashboard/fix-footer.sh" ]; then
+              bash /var/www/it-dashboard/fix-footer.sh
             else
-              echo "ℹ️ Backup rotation skipped (only $BACKUP_COUNT backups found)."
+              echo "⚠️ fix-footer.sh not found, skipping footer update."
             fi
 
-      - name: Deploy new files to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_KEY }}
-          source: "./*"
-          target: "/var/www/it-dashboard"
-          strip_components: 1
+            # Reload Nginx to apply updates
+            systemctl reload nginx
 
-      - name: Reload Nginx and restart PM2 service
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_KEY }}
-          script: |
-            echo "🔁 Reloading Nginx and restarting app..."
-            sudo systemctl reload nginx
-            if pm2 list | grep -q "it-dashboard"; then
-              pm2 restart it-dashboard
-            else
-              pm2 start "python3 -m http.server 8080" --name it-dashboard
-            fi
-
-            - name: Fix footer branding
-  run: sudo /var/www/it-dashboard/fix-footer.sh
-
-            echo "✅ Deployment complete."
+      # 3️⃣ Notify success
+      - name: Deployment complete
+        run: echo "✅ IT Dashboard deployed successfully with Savio branding!"
