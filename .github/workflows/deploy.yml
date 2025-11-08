@@ -1,53 +1,56 @@
-name: Dual Deploy to VPS (Staging + Production)
+name: Auto Deploy to VPS
 
 on:
   push:
-    branches: [ main, staging ]
+    branches:
+      - main
+      - staging
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_KEY }}
           script_stop: true
-          envs_format: true
           script: |
-            echo "🚀 Starting deploy for branch: ${{ github.ref_name }} at $(date)"
-
+            echo "🚀 Deploying branch: ${{ github.ref_name }}"
+            
+            # Define project path based on branch
             if [ "${{ github.ref_name }}" = "main" ]; then
-              APP_PATH="/var/www/it-dashboard"
+              APP_DIR="/var/www/it-dashboard"
               APP_NAME="it-dashboard"
             else
-              APP_PATH="/var/www/it-dashboard-staging"
+              APP_DIR="/var/www/it-dashboard-staging"
               APP_NAME="it-dashboard-staging"
             fi
 
-            echo "📁 Deploying to $APP_PATH"
-            cd $APP_PATH
+            cd $APP_DIR
 
-            echo "🔄 Pulling latest code..."
-            git fetch origin ${{ github.ref_name }}
-            git checkout ${{ github.ref_name }}
-            git pull origin ${{ github.ref_name }}
+            echo "📦 Pulling latest changes for $APP_NAME..."
+            git fetch origin
+            git reset --hard origin/${{ github.ref_name }}
 
-            echo "📦 Installing deps..."
-            if [ -f package.json ]; then
-              npm ci --omit=dev || npm install
-            fi
-
-            echo "⚙️ Restarting PM2..."
+            echo "🛠 Restarting PM2 app..."
             pm2 restart $APP_NAME || pm2 start npm --name "$APP_NAME" -- run start
+            pm2 save
 
-            echo "🌐 Reloading Nginx..."
-            sudo systemctl reload nginx
+            echo "✅ Deployment complete for $APP_NAME at $(date)"
 
-            echo "✅ ${APP_NAME} deploy complete at $(date)"
+      - name: Auto Tag Version
+        if: success()
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          TAG="deploy-${BRANCH}-$(date +'%Y-%m-%d_%H-%M')"
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git tag -a "$TAG" -m "Auto deployment tag for $BRANCH"
+          git push origin "$TAG"
