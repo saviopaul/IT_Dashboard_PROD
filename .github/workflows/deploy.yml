@@ -22,8 +22,21 @@ jobs:
           script_stop: true
           envs_format: true
           script: |
-            echo "🚀 Deploying latest version to /var/www/it-dashboard"
+            echo "🚀 Starting deployment at $(date)"
             cd /var/www/it-dashboard
+
+            echo "🔄 Pulling latest changes..."
             git pull origin main
+
+            echo "📦 Installing dependencies if changed..."
+            if [ -f package.json ]; then
+              npm ci --omit=dev || npm install
+            fi
+
+            echo "🔁 Restarting PM2 process..."
             pm2 restart it-dashboard || pm2 start npm --name "it-dashboard" -- run start
-            echo "✅ Deployment complete: $(date)"
+
+            echo "🌐 Reloading Nginx..."
+            sudo systemctl reload nginx
+
+            echo "✅ Deployment complete at $(date)"
