@@ -1,5 +1,4 @@
 name: Test VPS Connection
-
 on:
   workflow_dispatch:
 
@@ -7,16 +6,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify SSH Connection to VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_KEY }}
-          script_stop: true
-          envs_format: true
-          debug: true
-          script: |
-            echo "$VPS_KEY" | base64 -d > /tmp/vps_key.pem
-            chmod 600 /tmp/vps_key.pem
-            ssh -i /tmp/vps_key.pem -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "uptime && df -h | grep '/dev/'"
+      - name: Decode SSH key and test connection
+        env:
+          VPS_KEY: ${{ secrets.VPS_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          echo "$VPS_KEY" | base64 -d > id_rsa
+          chmod 600 id_rsa
+          echo "✅ SSH Key decoded successfully"
+          ssh -i id_rsa -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "echo 'Connected to:' $(hostname); uptime; df -h | grep /dev/"
