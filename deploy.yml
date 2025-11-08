@@ -1,4 +1,4 @@
-name: 🚀 Auto-Deploy IT Dashboard
+name: 🚀 Auto-Deploy IT Dashboard (Safe Backup)
 
 on:
   push:
@@ -7,14 +7,29 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Hostinger VPS
+    name: Deploy to Hostinger VPS with Backup
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy files to VPS
+      - name: Backup current deployment before update
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script: |
+            BACKUP_DIR="/root/backups"
+            mkdir -p "$BACKUP_DIR"
+            TS=$(date +'%Y%m%d_%H%M')
+            ZIP_PATH="$BACKUP_DIR/it-dashboard_$TS.zip"
+            echo "📦 Creating pre-deploy backup at $ZIP_PATH"
+            zip -r "$ZIP_PATH" /var/www/it-dashboard >/dev/null
+            echo "✅ Backup complete."
+
+      - name: Deploy new files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -24,16 +39,18 @@ jobs:
           target: "/var/www/it-dashboard"
           strip_components: 1
 
-      - name: Restart Nginx and PM2
+      - name: Reload Nginx and restart PM2 service
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_KEY }}
           script: |
+            echo "🔁 Reloading Nginx and restarting app..."
             sudo systemctl reload nginx
             if pm2 list | grep -q "it-dashboard"; then
               pm2 restart it-dashboard
             else
               pm2 start "python3 -m http.server 8080" --name it-dashboard
             fi
+            echo "✅ Deployment complete."
