@@ -63,4 +63,8 @@ jobs:
             else
               pm2 start "python3 -m http.server 8080" --name it-dashboard
             fi
+
+            - name: Fix footer branding
+  run: sudo /var/www/it-dashboard/fix-footer.sh
+
             echo "✅ Deployment complete."
