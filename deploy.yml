@@ -1,4 +1,4 @@
-name: 🚀 Auto-Deploy IT Dashboard (Safe Backup)
+name: 🚀 Auto-Deploy IT Dashboard (Safe Backup + Rotation)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Hostinger VPS with Backup
+    name: Deploy to Hostinger VPS with Backup Rotation
     runs-on: ubuntu-latest
 
     steps:
@@ -28,6 +28,16 @@ jobs:
             echo "📦 Creating pre-deploy backup at $ZIP_PATH"
             zip -r "$ZIP_PATH" /var/www/it-dashboard >/dev/null
             echo "✅ Backup complete."
+
+            # 🧹 Backup rotation: keep only latest 5 backups
+            BACKUP_COUNT=$(ls -1t $BACKUP_DIR/*.zip 2>/dev/null | wc -l)
+            if [ "$BACKUP_COUNT" -gt 5 ]; then
+              echo "🧹 Rotating backups (keeping only latest 5)..."
+              ls -1t $BACKUP_DIR/*.zip | tail -n +6 | xargs rm -f
+              echo "✅ Old backups removed."
+            else
+              echo "ℹ️ Backup rotation skipped (only $BACKUP_COUNT backups found)."
+            fi
 
       - name: Deploy new files to VPS
         uses: appleboy/scp-action@v0.1.7
