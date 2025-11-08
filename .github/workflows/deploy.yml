@@ -1,19 +1,18 @@
-name: Auto Deploy to VPS
+name: Dual Deploy to VPS (Staging + Production)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main, staging ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS via SSH
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -22,21 +21,33 @@ jobs:
           script_stop: true
           envs_format: true
           script: |
-            echo "🚀 Starting deployment at $(date)"
-            cd /var/www/it-dashboard
+            echo "🚀 Starting deploy for branch: ${{ github.ref_name }} at $(date)"
 
-            echo "🔄 Pulling latest changes..."
-            git pull origin main
+            if [ "${{ github.ref_name }}" = "main" ]; then
+              APP_PATH="/var/www/it-dashboard"
+              APP_NAME="it-dashboard"
+            else
+              APP_PATH="/var/www/it-dashboard-staging"
+              APP_NAME="it-dashboard-staging"
+            fi
 
-            echo "📦 Installing dependencies if changed..."
+            echo "📁 Deploying to $APP_PATH"
+            cd $APP_PATH
+
+            echo "🔄 Pulling latest code..."
+            git fetch origin ${{ github.ref_name }}
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
+
+            echo "📦 Installing deps..."
             if [ -f package.json ]; then
               npm ci --omit=dev || npm install
             fi
 
-            echo "🔁 Restarting PM2 process..."
-            pm2 restart it-dashboard || pm2 start npm --name "it-dashboard" -- run start
+            echo "⚙️ Restarting PM2..."
+            pm2 restart $APP_NAME || pm2 start npm --name "$APP_NAME" -- run start
 
             echo "🌐 Reloading Nginx..."
             sudo systemctl reload nginx
 
-            echo "✅ Deployment complete at $(date)"
+            echo "✅ ${APP_NAME} deploy complete at $(date)"
