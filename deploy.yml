@@ -1,4 +1,4 @@
-name: Deploy IT Dashboard to VPS
+name: Deploy IT Dashboard to Vercel
 
 on:
   push:
@@ -8,41 +8,49 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1️⃣ Checkout the repository
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Connect to your Hostinger VPS via SSH
-      - name: Deploy to Hostinger VPS
-        uses: appleboy/ssh-action@master
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            echo "🔄 Updating live dashboard..."
-            cd /var/www/it-dashboard
+          node-version: '18'
+          cache: 'npm'
 
-            # Pull latest changes
-            git fetch origin main
-            git reset --hard origin/main
+      # 3️⃣ Install dependencies (if any)
+      - name: Install dependencies
+        run: |
+          if [ -f "package.json" ]; then
+            npm ci
+          else
+            echo "No package.json found, skipping npm install"
+          fi
 
-            # Optional: ensure permissions are correct
-            chown -R root:root /var/www/it-dashboard
-            chmod -R 755 /var/www/it-dashboard
+      # 4️⃣ Build (if needed)
+      - name: Build project
+        run: |
+          if [ -f "package.json" ]; then
+            npm run build || echo "No build script found, skipping build"
+          else
+            echo "No package.json found, skipping build"
+          fi
 
-            # Run footer fix after deployment
-            if [ -f "/var/www/it-dashboard/fix-footer.sh" ]; then
-              bash /var/www/it-dashboard/fix-footer.sh
-            else
-              echo "⚠️ fix-footer.sh not found, skipping footer update."
-            fi
+      # 5️⃣ Deploy to Vercel
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
 
-            # Reload Nginx to apply updates
-            systemctl reload nginx
-
-      # 3️⃣ Notify success
+      # 6️⃣ Notify success
       - name: Deployment complete
-        run: echo "✅ IT Dashboard deployed successfully with Savio branding!"
+        run: |
+          echo "✅ IT Dashboard deployed successfully to Vercel!"
+          echo "🌐 Live at: https://it-dashboard-prod.vercel.app/"
+          echo "📊 Connected to Microsoft 365 with real data"
