@@ -9,6 +9,15 @@
 </head>
 <body>
     <div class="dashboard-container">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="loading-screen">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <h2>Loading IT Dashboard...</h2>
+                <p>Connecting to Microsoft 365</p>
+            </div>
+        </div>
+
         <!-- Left Sidebar Navigation -->
         <nav class="sidebar">
             <div class="sidebar-header">
@@ -17,37 +26,37 @@
             </div>
             
             <ul class="nav-menu">
-                <li class="nav-item active">
+                <li class="nav-item active" data-section="overview">
                     <a href="#" class="nav-link">
                         <span class="nav-icon">🏠</span>
                         <span class="nav-text">Overview</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-section="dashboard">
                     <a href="#" class="nav-link">
                         <span class="nav-icon">📊</span>
                         <span class="nav-text">Dashboard</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-section="servers">
                     <a href="#" class="nav-link">
-                        <span class="nav-icon">🖥</span>
+                        <span class="nav-icon">🖥️</span>
                         <span class="nav-text">Servers</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-section="network">
                     <a href="#" class="nav-link">
                         <span class="nav-icon">🌐</span>
                         <span class="nav-text">Network</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-section="alerts">
                     <a href="#" class="nav-link">
                         <span class="nav-icon">⚠️</span>
                         <span class="nav-text">Alerts</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-section="activity">
                     <a href="#" class="nav-link">
                         <span class="nav-icon">📈</span>
                         <span class="nav-text">Activity</span>
@@ -58,167 +67,226 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Module Cards Grid -->
-            <div class="modules-grid">
-                <!-- Backup Health Card -->
-                <div class="module-card backup-health">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <span>💾</span>
+            <!-- Overview Section -->
+            <div id="overview-section" class="content-section active">
+                <div class="section-header">
+                    <h2>System Overview</h2>
+                    <p>Real-time IT operational status</p>
+                </div>
+
+                <!-- Module Cards Grid -->
+                <div class="modules-grid">
+                    <!-- Backup Health Card -->
+                    <div class="module-card backup-health" data-metric="backup">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <span>💾</span>
+                            </div>
+                            <div class="card-title">
+                                <h3>Backup Health</h3>
+                                <p class="card-subtitle">System backup status</p>
+                            </div>
                         </div>
-                        <div class="card-title">
-                            <h3>Backup Health</h3>
-                            <p class="card-subtitle">System backup status</p>
+                        <div class="card-content">
+                            <div class="metric-value" data-value="backup-failed">2</div>
+                            <p class="metric-label">Backup failed</p>
+                            <div class="metric-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">Last run:</span>
+                                    <span class="detail-value" data-value="backup-last-run">2 hours ago</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    <div class="card-content">
-                        <div class="metric-value" id="backup-failed">2</div>
-                        <p class="metric-label">Backup failed</p>
-                        <div class="metric-details">
-                            <span class="detail-item">
-                                <span class="detail-label">Last run:</span>
-                                <span class="detail-value" id="backup-last-run">2 hours ago</span>
-                            </span>
+
+                    <!-- Renewals Due Card -->
+                    <div class="module-card renewals" data-metric="renewals">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <span>🔄</span>
+                            </div>
+                            <div class="card-title">
+                                <h3>Renewals Due</h3>
+                                <p class="card-subtitle">Upcoming renewals</p>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric-value" data-value="renewals-count">1</div>
+                            <p class="metric-label">Item expiring</p>
+                            <div class="metric-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">Next renewal:</span>
+                                    <span class="detail-value" data-value="renewal-next">7 days</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Helpdesk Tickets Card -->
+                    <div class="module-card helpdesk" data-metric="helpdesk">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <span>🎫</span>
+                            </div>
+                            <div class="card-title">
+                                <h3>Helpdesk Tickets</h3>
+                                <p class="card-subtitle">Support tickets status</p>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric-value" data-value="tickets-overdue">4</div>
+                            <p class="metric-label">Tickets overdue</p>
+                            <div class="metric-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">Open tickets:</span>
+                                    <span class="detail-value" data-value="tickets-open">12</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Joiners Card -->
+                    <div class="module-card joiners" data-metric="joiners">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <span>👥</span>
+                            </div>
+                            <div class="card-title">
+                                <h3>New Joiners</h3>
+                                <p class="card-subtitle">Employee onboarding</p>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric-value" data-value="joiners-count">2</div>
+                            <p class="metric-label">New employees</p>
+                            <div class="metric-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">In progress:</span>
+                                    <span class="detail-value" data-value="joiners-progress">2</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Project Status Card -->
+                    <div class="module-card projects" data-metric="projects">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <span>📋</span>
+                            </div>
+                            <div class="card-title">
+                                <h3>Project Status</h3>
+                                <p class="card-subtitle">IT project tracking</p>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric-value" data-value="projects-risk">1</div>
+                            <p class="metric-label">Project at risk</p>
+                            <div class="metric-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">Active projects:</span>
+                                    <span class="detail-value" data-value="projects-active">5</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CCTV Compliance Card -->
+                    <div class="module-card cctv" data-metric="cctv">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <span>📹</span>
+                            </div>
+                            <div class="card-title">
+                                <h3>CCTV Compliance</h3>
+                                <p class="card-subtitle">Screenshot submissions</p>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric-value" data-value="cctv-pending">3</div>
+                            <p class="metric-label">Screenshots pending</p>
+                            <div class="metric-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">Compliance rate:</span>
+                                    <span class="detail-value" data-value="cctv-compliance">85%</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Asset Alerts Card -->
+                    <div class="module-card assets" data-metric="assets">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <span>⚙️</span>
+                            </div>
+                            <div class="card-title">
+                                <h3>Asset Alerts</h3>
+                                <p class="card-subtitle">IT asset management</p>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric-value" data-value="assets-alerts">3</div>
+                            <p class="metric-label">Asset risks</p>
+                            <div class="metric-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">Total assets:</span>
+                                    <span class="detail-value" data-value="assets-total">127</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Renewals Due Card -->
-                <div class="module-card renewals">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <span>🔄</span>
-                        </div>
-                        <div class="card-title">
-                            <h3>Renewals Due</h3>
-                            <p class="card-subtitle">Upcoming renewals</p>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <div class="metric-value" id="renewals-count">1</div>
-                        <p class="metric-label">Item expiring</p>
-                        <div class="metric-details">
-                            <span class="detail-item">
-                                <span class="detail-label">Next renewal:</span>
-                                <span class="detail-value" id="renewal-next">7 days</span>
-                            </span>
-                        </div>
-                    </div>
+            <!-- Other Sections (Hidden by default) -->
+            <div id="dashboard-section" class="content-section">
+                <div class="section-header">
+                    <h2>Dashboard Details</h2>
+                    <p>Detailed metrics and analytics</p>
                 </div>
-
-                <!-- Helpdesk Tickets Card -->
-                <div class="module-card helpdesk">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <span>🎫</span>
-                        </div>
-                        <div class="card-title">
-                            <h3>Helpdesk Tickets</h3>
-                            <p class="card-subtitle">Support tickets status</p>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <div class="metric-value" id="tickets-overdue">4</div>
-                        <p class="metric-label">Tickets overdue</p>
-                        <div class="metric-details">
-                            <span class="detail-item">
-                                <span class="detail-label">Open tickets:</span>
-                                <span class="detail-value" id="tickets-open">12</span>
-                            </span>
-                        </div>
-                    </div>
+                <div class="detail-content">
+                    <p>Dashboard details coming soon...</p>
                 </div>
+            </div>
 
-                <!-- New Joiners Card -->
-                <div class="module-card joiners">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <span>👥</span>
-                        </div>
-                        <div class="card-title">
-                            <h3>New Joiners</h3>
-                            <p class="card-subtitle">Employee onboarding</p>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <div class="metric-value" id="joiners-count">2</div>
-                        <p class="metric-label">New employees</p>
-                        <div class="metric-details">
-                            <span class="detail-item">
-                                <span class="detail-label">In progress:</span>
-                                <span class="detail-value" id="joiners-progress">2</span>
-                            </span>
-                        </div>
-                    </div>
+            <div id="servers-section" class="content-section">
+                <div class="section-header">
+                    <h2>Server Management</h2>
+                    <p>Server status and performance</p>
                 </div>
-
-                <!-- Project Status Card -->
-                <div class="module-card projects">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <span>📋</span>
-                        </div>
-                        <div class="card-title">
-                            <h3>Project Status</h3>
-                            <p class="card-subtitle">IT project tracking</p>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <div class="metric-value" id="projects-risk">1</div>
-                        <p class="metric-label">Project at risk</p>
-                        <div class="metric-details">
-                            <span class="detail-item">
-                                <span class="detail-label">Active projects:</span>
-                                <span class="detail-value" id="projects-active">5</span>
-                            </span>
-                        </div>
-                    </div>
+                <div class="detail-content">
+                    <p>Server management coming soon...</p>
                 </div>
+            </div>
 
-                <!-- CCTV Compliance Card -->
-                <div class="module-card cctv">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <span>📹</span>
-                        </div>
-                        <div class="card-title">
-                            <h3>CCTV Compliance</h3>
-                            <p class="card-subtitle">Screenshot submissions</p>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <div class="metric-value" id="cctv-pending">3</div>
-                        <p class="metric-label">Screenshots pending</p>
-                        <div class="metric-details">
-                            <span class="detail-item">
-                                <span class="detail-label">Compliance rate:</span>
-                                <span class="detail-value" id="cctv-compliance">85%</span>
-                            </span>
-                        </div>
-                    </div>
+            <div id="network-section" class="content-section">
+                <div class="section-header">
+                    <h2>Network Status</h2>
+                    <p>Network connectivity and performance</p>
                 </div>
+                <div class="detail-content">
+                    <p>Network status coming soon...</p>
+                </div>
+            </div>
 
-                <!-- Asset Alerts Card -->
-                <div class="module-card assets">
-                    <div class="card-header">
-                        <div class="card-icon">
-                            <span>⚙️</span>
-                        </div>
-                        <div class="card-title">
-                            <h3>Asset Alerts</h3>
-                            <p class="card-subtitle">IT asset management</p>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <div class="metric-value" id="assets-alerts">3</div>
-                        <p class="metric-label">Asset risks</p>
-                        <div class="metric-details">
-                            <span class="detail-item">
-                                <span class="detail-label">Total assets:</span>
-                                <span class="detail-value" id="assets-total">127</span>
-                            </span>
-                        </div>
-                    </div>
+            <div id="alerts-section" class="content-section">
+                <div class="section-header">
+                    <h2>System Alerts</h2>
+                    <p>Active system alerts and notifications</p>
+                </div>
+                <div class="detail-content">
+                    <p>System alerts coming soon...</p>
+                </div>
+            </div>
+
+            <div id="activity-section" class="content-section">
+                <div class="section-header">
+                    <h2>Activity Overview</h2>
+                    <p>Recent system activities</p>
+                </div>
+                <div class="detail-content">
+                    <p>Activity overview coming soon...</p>
                 </div>
             </div>
 
@@ -227,7 +295,17 @@
                 <p>Made with <span class="dyad">Dyad</span></p>
                 <div class="connection-status">
                     <span class="status-indicator" id="connection-status"></span>
-                    <span class="status-text" id="status-text">Connecting to Microsoft 365...</span>
+                    <span class="status-text" id="status-text">Initializing...</span>
+                </div>
+                <div class="refresh-controls">
+                    <button id="refresh-btn" class="refresh-btn">
+                        <span class="refresh-icon">🔄</span>
+                        Refresh Data
+                    </button>
+                    <button id="auto-refresh-toggle" class="auto-refresh-toggle">
+                        <span class="toggle-icon">⏱️</span>
+                        Auto-refresh: <span id="auto-refresh-status">ON</span>
+                    </button>
                 </div>
             </footer>
         </main>
