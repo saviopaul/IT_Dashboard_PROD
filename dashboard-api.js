@@ -5,6 +5,28 @@ const MICROSOFT_CONFIG = {
   scope: 'https://graph.microsoft.com/.default'
 };
 
+// Dashboard state
+let dashboardData = {
+  backupFailed: 2,
+  backupLastRun: '2 hours ago',
+  renewalsCount: 1,
+  renewalNext: '7 days',
+  ticketsOverdue: 4,
+  ticketsOpen: 12,
+  joinersCount: 2,
+  joinersProgress: 2,
+  projectsRisk: 1,
+  projectsActive: 5,
+  cctvPending: 3,
+  cctvCompliance: '85%',
+  assetsAlerts: 3,
+  assetsTotal: 127,
+  lastUpdated: new Date().toISOString()
+};
+
+let autoRefresh = true;
+let refreshInterval = null;
+
 // Get access token
 async function getAccessToken() {
   try {
@@ -102,7 +124,6 @@ function calculateMetrics(helpdeskTickets, itAssets) {
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  // Calculate metrics
   const overdueTickets = helpdeskTickets.filter(ticket => {
     const createdDate = new Date(ticket.created || ticket.Created || '');
     const status = ticket.Status || ticket.status || '';
@@ -145,66 +166,99 @@ function calculateMetrics(helpdeskTickets, itAssets) {
     cctvPending: 3, // Would come from CCTV tracking
     cctvCompliance: '85%',
     assetsAlerts: assetAlerts.length,
-    assetsTotal: itAssets.length
+    assetsTotal: itAssets.length,
+    source: helpdeskTickets.length > 0 ? 'Microsoft 365' : 'Demo Data'
   };
 }
 
-// Update dashboard with real data
-function updateDashboard(metrics) {
+// Update dashboard with data
+function updateDashboard(data) {
+  // Hide loading screen
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    loadingScreen.style.display = 'none';
+  }
+
   // Update Backup Health
-  document.getElementById('backup-failed').textContent = metrics.backupFailed;
-  document.getElementById('backup-last-run').textContent = metrics.backupLastRun;
+  updateMetricValue('backup-failed', data.backupFailed);
+  updateMetricValue('backup-last-run', data.backupLastRun);
 
   // Update Renewals
-  document.getElementById('renewals-count').textContent = metrics.renewalsCount;
-  document.getElementById('renewal-next').textContent = metrics.renewalNext;
+  updateMetricValue('renewals-count', data.renewalsCount);
+  updateMetricValue('renewal-next', data.renewalNext);
 
   // Update Helpdesk Tickets
-  document.getElementById('tickets-overdue').textContent = metrics.ticketsOverdue;
-  document.getElementById('tickets-open').textContent = metrics.ticketsOpen;
+  updateMetricValue('tickets-overdue', data.ticketsOverdue);
+  updateMetricValue('tickets-open', data.ticketsOpen);
 
   // Update New Joiners
-  document.getElementById('joiners-count').textContent = metrics.joinersCount;
-  document.getElementById('joiners-progress').textContent = metrics.joinersProgress;
+  updateMetricValue('joiners-count', data.joinersCount);
+  updateMetricValue('joiners-progress', data.joinersProgress);
 
   // Update Project Status
-  document.getElementById('projects-risk').textContent = metrics.projectsRisk;
-  document.getElementById('projects-active').textContent = metrics.projectsActive;
+  updateMetricValue('projects-risk', data.projectsRisk);
+  updateMetricValue('projects-active', data.projectsActive);
 
   // Update CCTV Compliance
-  document.getElementById('cctv-pending').textContent = metrics.cctvPending;
-  document.getElementById('cctv-compliance').textContent = metrics.cctvCompliance;
+  updateMetricValue('cctv-pending', data.cctvPending);
+  updateMetricValue('cctv-compliance', data.cctvCompliance);
 
   // Update Asset Alerts
-  document.getElementById('assets-alerts').textContent = metrics.assetsAlerts;
-  document.getElementById('assets-total').textContent = metrics.assetsTotal;
+  updateMetricValue('assets-alerts', data.assetsAlerts);
+  updateMetricValue('assets-total', data.assetsTotal);
 
   // Update connection status
+  updateConnectionStatus('connected', data.source);
+}
+
+// Update metric value with animation
+function updateMetricValue(elementId, value) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.classList.add('loading');
+    element.textContent = value;
+    setTimeout(() => {
+      element.classList.remove('loading');
+    }, 500);
+  }
+}
+
+// Update connection status
+function updateConnectionStatus(status, source = 'Demo') {
   const statusIndicator = document.getElementById('connection-status');
   const statusText = document.getElementById('status-text');
   
-  statusIndicator.classList.remove('connecting', 'connected', 'error');
-  statusIndicator.classList.add('connected');
-  statusText.textContent = 'Connected to Microsoft 365';
+  if (statusIndicator && statusText) {
+    statusIndicator.classList.remove('connecting', 'connected', 'error');
+    statusIndicator.classList.add(status);
+    
+    if (status === 'connected') {
+      statusText.textContent = `Connected to ${source}`;
+    } else if (status === 'error') {
+      statusText.textContent = 'Connection Error';
+    } else {
+      statusText.textContent = 'Connecting...';
+    }
+  }
 }
 
 // Show loading state
 function showLoading() {
-  const statusIndicator = document.getElementById('connection-status');
-  const statusText = document.getElementById('status-text');
-  
-  statusIndicator.classList.add('connecting');
-  statusText.textContent = 'Connecting to Microsoft 365...';
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    loadingScreen.style.display = 'flex';
+  }
+  updateConnectionStatus('connecting');
 }
 
 // Show error state
 function showError(error) {
-  const statusIndicator = document.getElementById('connection-status');
-  const statusText = document.getElementById('status-text');
-  
-  statusIndicator.classList.remove('connecting', 'connected');
-  statusIndicator.classList.add('error');
-  statusText.textContent = `Error: ${error}`;
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    loadingScreen.style.display = 'none';
+  }
+  updateConnectionStatus('error');
+  console.error('Dashboard error:', error);
 }
 
 // Main function to fetch and update dashboard
@@ -237,43 +291,135 @@ async function updateDashboardWithRealData() {
   }
 }
 
+// Navigation functionality
+function initializeNavigation() {
+  const navItems = document.querySelectorAll('.nav-item');
+  const sections = document.querySelectorAll('.content-section');
+  
+  navItems.forEach(item => {
+    item.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      const targetSection = this.getAttribute('data-section');
+      
+      // Remove active class from all nav items and sections
+      navItems.forEach(navItem => navItem.classList.remove('active'));
+      sections.forEach(section => section.classList.remove('active'));
+      
+      // Add active class to clicked nav item and corresponding section
+      this.classList.add('active');
+      const targetSectionElement = document.getElementById(`${targetSection}-section`);
+      if (targetSectionElement) {
+        targetSectionElement.classList.add('active');
+      }
+      
+      console.log('Navigation clicked:', targetSection);
+    });
+  });
+}
+
+// Refresh functionality
+function initializeRefresh() {
+  const refreshBtn = document.getElementById('refresh-btn');
+  const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
+  const autoRefreshStatus = document.getElementById('auto-refresh-status');
+  
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function() {
+      console.log('Manual refresh triggered');
+      updateDashboardWithRealData();
+    });
+  }
+  
+  if (autoRefreshToggle && autoRefreshStatus) {
+    autoRefreshToggle.addEventListener('click', function() {
+      autoRefresh = !autoRefresh;
+      autoRefreshStatus.textContent = autoRefresh ? 'ON' : 'OFF';
+      
+      if (autoRefresh) {
+        startAutoRefresh();
+        console.log('Auto-refresh enabled');
+      } else {
+        stopAutoRefresh();
+        console.log('Auto-refresh disabled');
+      }
+    });
+  }
+}
+
+// Auto-refresh functions
+function startAutoRefresh() {
+  stopAutoRefresh(); // Clear any existing interval
+  refreshInterval = setInterval(updateDashboardWithRealData, 5 * 60 * 1000);
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+}
+
+// Keyboard shortcuts
+function initializeKeyboardShortcuts() {
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
+      event.preventDefault();
+      console.log('Manual refresh triggered by keyboard');
+      updateDashboardWithRealData();
+    }
+  });
+}
+
+// Card click interactions
+function initializeCardInteractions() {
+  const cards = document.querySelectorAll('.module-card');
+  
+  cards.forEach(card => {
+    card.addEventListener('click', function() {
+      const metric = this.getAttribute('data-metric');
+      console.log('Card clicked:', metric);
+      
+      // Add pulse animation
+      this.style.animation = 'none';
+      setTimeout(() => {
+        this.style.animation = '';
+      }, 10);
+    });
+  });
+}
+
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
   console.log('Initializing IT Dashboard...');
   
-  // Update with real data immediately
+  // Initialize all components
+  initializeNavigation();
+  initializeRefresh();
+  initializeKeyboardShortcuts();
+  initializeCardInteractions();
+  
+  // Start with demo data first, then try to get real data
+  updateDashboard(dashboardData);
+  
+  // Try to get real data
   updateDashboardWithRealData();
   
-  // Refresh data every 5 minutes
-  setInterval(updateDashboardWithRealData, 5 * 60 * 1000);
-  
-  // Add refresh functionality
-  document.addEventListener('keydown', function(event) {
-    if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
-      event.preventDefault();
-      updateDashboardWithRealData();
-    }
-  });
+  // Start auto-refresh if enabled
+  if (autoRefresh) {
+    startAutoRefresh();
+  }
   
   console.log('IT Dashboard initialized successfully');
 });
 
-// Add click handlers for navigation
-document.addEventListener('DOMContentLoaded', function() {
-  const navLinks = document.querySelectorAll('.nav-link');
-  
-  navLinks.forEach(link => {
-    link.addEventListener('click', function(event) {
-      event.preventDefault();
-      
-      // Remove active class from all links
-      navLinks.forEach(l => l.parentElement.classList.remove('active'));
-      
-      // Add active class to clicked link
-      this.parentElement.classList.add('active');
-      
-      // Here you could show different views based on selection
-      console.log('Navigation clicked:', this.querySelector('.nav-text').textContent);
-    });
-  });
+// Handle page visibility change
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    stopAutoRefresh();
+  } else {
+    if (autoRefresh) {
+      startAutoRefresh();
+    }
+  }
 });
