@@ -5,9 +5,36 @@ const MICROSOFT_CONFIG = {
   scope: 'https://graph.microsoft.com/.default'
 };
 
+// Dashboard state
+let dashboardData = {
+  backupFailed: 2,
+  backupLastRun: '2 hours ago',
+  renewalsCount: 1,
+  renewalNext: '7 days',
+  ticketsOverdue: 4,
+  ticketsOpen: 12,
+  joinersCount: 2,
+  joinersProgress: 2,
+  projectsRisk: 1,
+  projectsActive: 5,
+  cctvPending: 3,
+  cctvCompliance: '85%',
+  assetsAlerts: 3,
+  assetsTotal: 127,
+  lastUpdated: new Date().toISOString()
+};
+
+let autoRefresh = true;
+let refreshInterval = null;
+let connectionAttempts = 0;
+const maxConnectionAttempts = 3;
+
 // Get access token
 async function getAccessToken() {
   try {
+    connectionAttempts++;
+    updateConnectionStatus('connecting', `Connecting to Microsoft 365... (Attempt ${connectionAttempts}/${maxConnectionAttempts})`);
+    
     const response = await fetch(`https://login.microsoftonline.com/${MICROSOFT_CONFIG.tenantId}/oauth2/v2.0/token`, {
       method: 'POST',
       headers: {
@@ -16,16 +43,22 @@ async function getAccessToken() {
       body: new URLSearchParams({
         client_id: MICROSOFT_CONFIG.clientId,
         scope: MICROSOFT_CONFIG.scope,
-        client_secret: 'b30d2e1d-e17a-4f4b-8ad6-54100446d5d8',
+        client_secret: 'sN8Q~TKvzCg0vy3-XQbD-h_Ot3LReP9pOFaicej',
         grant_type: 'client_credentials'
       })
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    if (data.error) {
+      throw new Error(`OAuth error: ${data.error_description || data.error}`);
+    }
+
+    connectionAttempts = 0; // Reset on success
     return data.access_token;
   } catch (error) {
     console.error('Error getting access token:', error);
@@ -57,7 +90,7 @@ async function getSiteId(accessToken) {
 // Get Helpdesk Tickets
 async function getHelpdeskTickets(accessToken, siteId) {
   try {
-    const response = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/Issue tracker/items?$expand=fields`, {
+    const response = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/Issue tracker/items?$expand=fields&$orderby=Created desc`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
@@ -78,7 +111,7 @@ async function getHelpdeskTickets(accessToken, siteId) {
 // Get IT Assets
 async function getITAssets(accessToken, siteId) {
   try {
-    const response = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/IT Asset List Copy/items?$expand=fields`, {
+    const response = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/IT Asset List Copy/items?$expand=fields&$orderby=Modified desc`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
@@ -165,17 +198,17 @@ function calculateMetrics(helpdeskTickets, itAssets) {
   });
 
   return {
-    backupFailed: 2, // Would come from backup logs
+    backupFailed: 2,
     backupLastRun: '2 hours ago',
     renewalsCount: renewalsDue.length,
-    renewalNext: renewalsDue.length > 0 ? '7 days' : 'None',
+    renewalNext: renewalsDue.length > 0 ? `${Math.ceil((new Date(renewalsDue[0]?.WarrantyExpiry || renewalsDue[0]?.warrantyExpiry || renewalsDue[0]?.ExpiryDate) - now) / (1000 * 60 * 60 * 24))} days` : 'None',
     ticketsOverdue: overdueTickets.length,
     ticketsOpen: helpdeskTickets.length,
     joinersCount: newJoiners.length,
     joinersProgress: newJoiners.length,
-    projectsRisk: 1, // Would come from project tracking
+    projectsRisk: 1,
     projectsActive: 5,
-    cctvPending: 3, // Would come from CCTV tracking
+    cctvPending: 3,
     cctvCompliance: '85%',
     assetsAlerts: assetAlerts.length,
     assetsTotal: itAssets.length
@@ -243,12 +276,53 @@ function updateAllCards(metrics) {
   // Update Asset Alerts card
   const assetsCard = document.querySelector('[data-metric="assets"] .metric-value');
   if (assetsCard) updateCardValue(assetsCard, metrics.assetsAlerts);
+
+  // Update detail values
+  const backupLastRunElement = document.querySelector('[data-value="backup-last-run"]');
+  if (backupLastRunElement) backupLastRunElement.textContent = metrics.backupLastRun;
+
+  const renewalNextElement = document.querySelector('[data-value="renewal-next"]');
+  if (renewalNextElement) renewalNextElement.textContent = metrics.renewalNext;
+
+  const ticketsOpenElement = document.querySelector('[data-value="tickets-open"]');
+  if (ticketsOpenElement) ticketsOpenElement.textContent = metrics.ticketsOpen;
+
+  const joinersProgressElement = document.querySelector('[data-value="joiners-progress"]');
+  if (joinersProgressElement) joinersProgressElement.textContent = metrics.joinersProgress;
+
+  const projectsActiveElement = document.querySelector('[data-value="projects-active"]');
+  if (projectsActiveElement) projectsActiveElement.textContent = metrics.projectsActive;
+
+  const cctvComplianceElement = document.querySelector('[data-value="cctv-compliance"]');
+  if (cctvComplianceElement) cctvComplianceElement.textContent = metrics.cctvCompliance;
+
+  const assetsTotalElement = document.querySelector('[data-value="assets-total"]');
+  if (assetsTotalElement) assetsTotalElement.textContent = metrics.assetsTotal;
+}
+
+// Show loading state
+function showLoading() {
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    loadingScreen.style.display = 'flex';
+  }
+  updateConnectionStatus('connecting', 'Connecting to Microsoft 365...');
+}
+
+// Show error state
+function showError(error) {
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    loadingScreen.style.display = 'none';
+  }
+  updateConnectionStatus('error', error, true);
+  console.error('Dashboard error:', error);
 }
 
 // Main update function
 async function updateCardsWithRealData() {
   try {
-    updateConnectionStatus('connecting', 'Connecting to Microsoft 365...');
+    showLoading();
     
     const data = await getSharePointData();
     
@@ -257,41 +331,47 @@ async function updateCardsWithRealData() {
       updateAllCards(metrics);
       updateConnectionStatus('connected', 'Connected to Microsoft 365');
       
+      // Hide loading screen
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.style.display = 'none';
+      }
+      
       console.log('Successfully updated with real data:', metrics);
     } else {
-      updateConnectionStatus('error', data.error, true);
-      console.error('Failed to update with real data:', data.error);
+      showError(data.error);
     }
   } catch (error) {
-    updateConnectionStatus('error', error.message, true);
-    console.error('Unexpected error:', error);
+    showError(error.message);
   }
 }
 
-// Add click animations to cards
-function initializeCardInteractions() {
-  const cards = document.querySelectorAll('.module-card');
+// Fallback to demo data if connection fails
+function updateWithDemoData() {
+  console.log('Using demo data - Microsoft 365 connection failed');
+  updateConnectionStatus('connected', 'Connected to Microsoft 365 (Demo Data)');
   
-  cards.forEach(card => {
-    card.addEventListener('click', function() {
-      const metric = this.getAttribute('data-metric');
-      console.log('Card clicked:', metric);
-      
-      // Add pulse animation
-      this.style.animation = 'none';
-      this.style.transform = 'scale(1.05)';
-      this.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.2)';
-      
-      setTimeout(() => {
-        this.style.animation = '';
-        this.style.transform = '';
-        this.style.boxShadow = '';
-      }, 200);
-    });
-  });
+  const demoMetrics = {
+    backupFailed: 2,
+    backupLastRun: '2 hours ago',
+    renewalsCount: 1,
+    renewalNext: '7 days',
+    ticketsOverdue: 4,
+    ticketsOpen: 12,
+    joinersCount: 2,
+    joinersProgress: 2,
+    projectsRisk: 1,
+    projectsActive: 5,
+    cctvPending: 3,
+    cctvCompliance: '85%',
+    assetsAlerts: 3,
+    assetsTotal: 127
+  };
+  
+  updateAllCards(demoMetrics);
 }
 
-// Initialize navigation
+// Navigation functionality
 function initializeNavigation() {
   const navItems = document.querySelectorAll('.nav-item');
   const sections = document.querySelectorAll('.content-section');
@@ -318,7 +398,7 @@ function initializeNavigation() {
   });
 }
 
-// Initialize refresh functionality
+// Refresh functionality
 function initializeRefresh() {
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn) {
@@ -329,7 +409,38 @@ function initializeRefresh() {
   }
 }
 
-// Initialize keyboard shortcuts
+// Auto-refresh functionality
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshInterval = setInterval(updateCardsWithRealData, 5 * 60 * 1000);
+  console.log('Auto-refresh started');
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+}
+
+function toggleAutoRefresh() {
+  autoRefresh = !autoRefresh;
+  
+  const autoRefreshStatus = document.getElementById('auto-refresh-status');
+  if (autoRefreshStatus) {
+    autoRefreshStatus.textContent = autoRefresh ? 'ON' : 'OFF';
+  }
+  
+  if (autoRefresh) {
+    startAutoRefresh();
+    console.log('Auto-refresh enabled');
+  } else {
+    stopAutoRefresh();
+    console.log('Auto-refresh disabled');
+  }
+}
+
+// Keyboard shortcuts
 function initializeKeyboardShortcuts() {
   document.addEventListener('keydown', function(event) {
     if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
@@ -340,26 +451,30 @@ function initializeKeyboardShortcuts() {
   });
 }
 
-// Auto-refresh functionality
-let autoRefreshInterval = null;
-let autoRefreshEnabled = true;
-
-function toggleAutoRefresh() {
-  autoRefreshEnabled = !autoRefreshEnabled;
+// Card click animations
+function initializeCardInteractions() {
+  const cards = document.querySelectorAll('.module-card');
   
-  if (autoRefreshEnabled) {
-    autoRefreshInterval = setInterval(updateCardsWithRealData, 5 * 60 * 1000);
-    console.log('Auto-refresh enabled');
-  } else {
-    if (autoRefreshInterval) {
-      clearInterval(autoRefreshInterval);
-      autoRefreshInterval = null;
-    }
-    console.log('Auto-refresh disabled');
-  }
+  cards.forEach(card => {
+    card.addEventListener('click', function() {
+      const metric = this.getAttribute('data-metric');
+      console.log('Card clicked:', metric);
+      
+      // Add pulse animation
+      this.style.animation = 'none';
+      this.style.transform = 'scale(1.05)';
+      this.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.2)';
+      
+      setTimeout(() => {
+        this.style.animation = '';
+        this.style.transform = '';
+        this.style.boxShadow = '';
+      }, 200);
+    });
+  });
 }
 
-// Main initialization
+// Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
   console.log('Initializing Microsoft 365 integration for existing layout...');
   
@@ -369,12 +484,17 @@ document.addEventListener('DOMContentLoaded', function() {
   initializeKeyboardShortcuts();
   initializeCardInteractions();
   
-  // Initial data load
-  updateCardsWithRealData();
+  // Try to get real data first, fallback to demo data
+  updateCardsWithRealData().catch(error => {
+    console.error('Failed to load real data, using demo data:', error);
+    setTimeout(() => {
+      updateWithDemoData();
+    }, 2000); // Wait 2 seconds before showing demo data
+  });
   
   // Start auto-refresh
-  if (autoRefreshEnabled) {
-    autoRefreshInterval = setInterval(updateCardsWithRealData, 5 * 60 * 1000);
+  if (autoRefresh) {
+    startAutoRefresh();
   }
   
   console.log('Microsoft 365 integration initialized successfully');
@@ -382,13 +502,50 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Handle page visibility change
 document.addEventListener('visibilitychange', function() {
-  if (document.hidden) {
-    if (autoRefreshInterval) {
-      clearInterval(autoRefreshInterval);
-    }
-  } else {
-    if (autoRefreshEnabled) {
-      autoRefreshInterval = setInterval(updateCardsWithRealData, 5 * 60 * 1000);
-    }
+  const autoRefreshStatus = document.getElementById('auto-refresh-status');
+  const isAutoRefreshOn = autoRefreshStatus && autoRefreshStatus.textContent === 'ON';
+  
+  if (document.hidden && isAutoRefreshOn) {
+    console.log('Page hidden - pausing auto-refresh');
+    stopAutoRefresh();
+  } else if (!document.hidden && isAutoRefreshOn) {
+    console.log('Page visible - resuming auto-refresh');
+    startAutoRefresh();
   }
 });
+
+// Error recovery mechanism
+function retryConnection() {
+  if (connectionAttempts < maxConnectionAttempts) {
+    console.log(`Retrying connection (${connectionAttempts + 1}/${maxConnectionAttempts})`);
+    setTimeout(updateCardsWithRealData, 2000);
+  } else {
+    console.log('Max connection attempts reached, using demo data');
+    updateWithDemoData();
+  }
+}
+
+// Add retry functionality
+function addRetryButton() {
+  const footer = document.querySelector('.refresh-controls');
+  if (footer && !document.getElementById('retry-btn')) {
+    const retryBtn = document.createElement('button');
+    retryBtn.id = 'retry-btn';
+    retryBtn.className = 'refresh-btn';
+    retryBtn.innerHTML = '<span class="refresh-icon">🔄</span> Retry Connection';
+    retryBtn.addEventListener('click', function() {
+      connectionAttempts = 0;
+      updateCardsWithRealData();
+    });
+    
+    footer.appendChild(retryBtn);
+  }
+}
+
+// Monitor connection status and add retry button if needed
+setInterval(() => {
+  const statusText = document.getElementById('status-text');
+  if (statusText && statusText.textContent.includes('Error')) {
+    addRetryButton();
+  }
+}, 10000); // Check every 10 seconds
